@@ -6,7 +6,7 @@ import re
 import requests
 import pandas as pd
 from websocket import create_connection
-from DBHelper import DBHelper
+# from DBHelper import DBHelper
 #
 # try:
 #     import thread
@@ -17,10 +17,10 @@ import time
 
 class TradingViewWSS(threading.Thread):
 
-    def __init__(self):
+    def __init__(self, database_connection):
         # websocket.enableTrace(True)
         threading.Thread.__init__(self)
-        self.db = DBHelper()
+        self.db = database_connection
         headers = json.dumps({
             'Connection': 'upgrade',
             'Host': 'data.tradingview.com',
@@ -152,6 +152,10 @@ class TradingViewWSS(threading.Thread):
         elif market_status == 'out_of_session':
             return "close"
 
+    def disconnect(self):
+        if self.ws.connected:
+            self.ws.close()
+
     @staticmethod
     def __make_request(method, url, data=None):
         """
@@ -205,14 +209,13 @@ def on_error(ws, error):
 def on_close(ws):
     print("### closed ###")
 
-
 #
-trading = TradingViewWSS()
-trading.start()
-time.sleep(10)
-trading.add_symbols("NYSE:DIS")
-trading.add_symbols("NYSE:CAT")
-trading.add_symbols("NASDAQ:AAPL")
-time.sleep(5)
-trading.make_fast_query()
-print(trading.get_market_status())
+# trading = TradingViewWSS()
+# trading.start()
+# time.sleep(10)
+# trading.add_symbols("NYSE:DIS")
+# trading.add_symbols("NYSE:CAT")
+# trading.add_symbols("NASDAQ:AAPL")
+# time.sleep(5)
+# trading.make_fast_query()
+# print(trading.get_market_status())

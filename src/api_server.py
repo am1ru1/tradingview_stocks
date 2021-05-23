@@ -1,18 +1,53 @@
 import re
+import logging
+import threading
+import time
+import signal
 
-from src.pytradingview.pyTrading import PyTrading
+from src.pytradingview.TradingViewWebsocket import TradingViewWSS
 from src.pytradingview.DBHelper import DBHelper
 from flask import Flask, json, request
 
+logger = logging.getLogger('FlaskApp')
+log_format = logging.Formatter("%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s")
+console_handler = logging.StreamHandler()
+file_handler = logging.FileHandler("Application.log")
+console_handler.setFormatter(log_format)
+file_handler.setFormatter(log_format)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
+
+
+def signal_handler(signum, frame):
+    pytrading_api.disconnect()
+
+
 api = Flask(__name__)
-pytrading_api = PyTrading()
-
 database = DBHelper()
+exit_event = threading.Event()
+signal.signal(signal.SIGINT, signal_handler)
+pytrading_api = TradingViewWSS(database_connection=database)
+pytrading_api.daemon = True
+pytrading_api.start()
+pytrading_api.join()
 
 
-@api.route('/symbol/<ticker>', methods=['GET'])
+@api.route('/symbol/<ticker>', methods=['GET', 'POST'])
 def get_symbol_info(ticker):
+    logger.debug(f'Getting {ticker} info')
+    if request.method == 'POST':
+        pytrading_api.add_symbols(ticker)
+        time.sleep(5)
+        pytrading_api.make_fast_query()
+        return {
+            'action': 'started..'
+        }
     data = database.get_symbol(ticker)
+    if 'Error' in data:
+        logger.warning(f'Cant find {ticker}')
+    else:
+        logger.debug(f'Ticker info:{json.dumps(data)}')
     return json.dumps(data)
 
 
