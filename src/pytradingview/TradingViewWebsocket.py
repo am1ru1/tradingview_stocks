@@ -72,7 +72,7 @@ class TradingViewWSS(threading.Thread):
 
     def parse_json(self, sec_data):
         print(f'#### DATA ####\n{sec_data}\n#### END DATA ####')
-        if sec_data["s"] == "ok" and "rtc" in sec_data["v"] or "rchp" in sec_data["v"]:
+        if sec_data["s"] == "ok" and "rtc" in sec_data["v"] or "rchp" in sec_data["v"] and self.market_status == 'pre-market':
             print(f'RealTime')
             print(f'Symbol: {sec_data["n"]}\nPrice: {sec_data["v"]["rtc"]}\nChange: {sec_data["v"]["rchp"]}')
             if sec_data["v"]["rchp"] == 0:

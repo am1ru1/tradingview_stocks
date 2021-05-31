@@ -30,7 +30,6 @@ signal.signal(signal.SIGINT, signal_handler)
 pytrading_api = TradingViewWSS(database_connection=database)
 pytrading_api.daemon = True
 pytrading_api.start()
-pytrading_api.join()
 
 
 @api.route('/symbol/<ticker>', methods=['GET', 'POST'])
@@ -41,7 +40,7 @@ def get_symbol_info(ticker):
         time.sleep(5)
         pytrading_api.make_fast_query()
         return {
-            'action': 'started..'
+            'status': 'ok'
         }
     data = database.get_symbol(ticker)
     if 'Error' in data:
@@ -58,8 +57,10 @@ def update_watchlist(user_id, ticker):
     return json.dumps("status: ok")
 
 
-@api.route('/users/<user_id>/', methods=['GET'])
+@api.route('/users/<user_id>/', methods=['GET', 'POST'])
 def check_watchlist(user_id):
+    if request.method == 'POST':
+        database.create_user_table()
     if request.method == 'GET':
         response = list()
         data = json.dumps(database.get_user_watchlist(user_id))
@@ -71,3 +72,4 @@ def check_watchlist(user_id):
 
 if __name__ == '__main__':
     api.run(threaded=True, debug=True)
+
