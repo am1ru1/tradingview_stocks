@@ -21,7 +21,7 @@ class TradingViewWSS(threading.Thread):
         # websocket.enableTrace(True)
         threading.Thread.__init__(self)
         self.db = database_connection
-        headers = json.dumps({
+        self.headers = json.dumps({
             'Connection': 'upgrade',
             'Host': 'data.tradingview.com',
             'Origin': 'https://data.tradingview.com',
@@ -36,14 +36,20 @@ class TradingViewWSS(threading.Thread):
         })
         self.market_status = self.get_market_status()
         self.symbol_list = list()
-        self.ws = create_connection('wss://data.tradingview.com/socket.io/websocket', headers=headers)
+        self.ws = create_connection('wss://data.tradingview.com/socket.io/websocket', headers=self.headers)
         self.session = self.generate_session()
         self.symbol_list.append(self.session)
-        self.symbol_list.append('NYSE:TGT')
         print(f'Session: {self.session}')
         self.chart_session = self.generate_chart_session()
         print(f'Chart session: {self.chart_session}')
+        # first_scan = self.db.get_all_symbols()
+        # first_scan = json.dumps(first_scan)
+        # clean_noises = re.sub('[^A-Za-z0-9:,.]+', '', first_scan)
+        # cleaned_data = clean_noises.split(",")
+        # for clean in cleaned_data:
+        #     self.add_symbols(clean)
         self.__run_first_request()
+        self.make_fast_query()
 
     def run(self) -> None:
         a = ""
@@ -68,25 +74,33 @@ class TradingViewWSS(threading.Thread):
                 a = a + response + "\n"
             except Exception as error:
                 print(error)
-                break
+                if not self.ws.connected:
+                    self.ws.create_connection('wss://data.tradingview.com/socket.io/websocket', headers=headers)
+
 
     def parse_json(self, sec_data):
         print(f'#### DATA ####\n{sec_data}\n#### END DATA ####')
-        if sec_data["s"] == "ok" and "rtc" in sec_data["v"] or "rchp" in sec_data["v"] and self.market_status == 'pre-market':
+        if sec_data["s"] == "ok" and "rtc" in sec_data["v"] or "rchp" in sec_data[
+            "v"] and self.market_status == 'pre-market':
             print(f'RealTime')
             print(f'Symbol: {sec_data["n"]}\nPrice: {sec_data["v"]["rtc"]}\nChange: {sec_data["v"]["rchp"]}')
             if sec_data["v"]["rchp"] == 0:
-                self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"])
+                self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"],
+                                      sec_data["v"]['local_description'])
             else:
-                self.db.update_symbol(sec_data["n"], sec_data["v"]["rchp"], sec_data["v"]["rtc"])
+                self.db.update_symbol(sec_data["n"], sec_data["v"]["rchp"], sec_data["v"]["rtc"],
+                                      sec_data["v"]['local_description'])
         elif "lp" in sec_data["v"] and "ch" in sec_data["v"]:
             print("Non-Real")
             if "chp" in sec_data["v"]:
                 print(f'Symbol: {sec_data["n"]}\nPrice: {sec_data["v"]["lp"]}\nChange: {sec_data["v"]["chp"]}')
-                self.db.update_symbol(sec_data["n"], sec_data["v"]["chp"], sec_data["v"]["lp"])
+                if 'local_description' in sec_data["v"]:
+                    self.db.update_symbol(sec_data["n"], sec_data["v"]["chp"], sec_data["v"]["lp"], 'null')
+                else:
+                    self.db.update_symbol(sec_data["n"], sec_data["v"]["chp"], sec_data["v"]["lp"], 'null')
             else:
                 print(f'Symbol: {sec_data["n"]}\nPrice: {sec_data["v"]["lp"]}\nChange: {sec_data["v"]["ch"]}')
-                self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"])
+                self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"], 'null')
         else:
             print(f"Cant find parameters at the JSON file.\n{sec_data}]n")
 
@@ -102,13 +116,12 @@ class TradingViewWSS(threading.Thread):
                                          "original_name", "pricescale",
                                          "pro_name", "short_name", "type", "update_mode", "volume", "currency_code",
                                          "rchp", "rtc"]))
-        self.ws.send(
-            self.generate_json("quote_add_symbols", [self.session, "NYSE:TGT", {"flags": ['force_permission']}]))
-        self.ws.send(self.generate_json("resolve_symbol", [self.chart_session, "symbol_" + "5",
-                                                           "={\"symbol\":\"NYSE:TGT\",\"adjustment\":\"splits\"}"]))
+        # self.ws.send(
+        #     self.generate_json("quote_add_symbols", [self.session, "NYSE:TGT", {"flags": ['force_permission']}]))
+
         self.ws.send(self.generate_json("create_series",
                                         [self.chart_session, "s" + "5", "s" + "5", "symbol_" + "5", "5", 100]))
-        self.ws.send(self.generate_json("quote_fast_symbols", [self.session, "NYSE:TGT"]))
+        # self.ws.send(self.generate_json("quote_fast_symbols", [self.session, "NYSE:TGT"]))
         self.ws.send(self.generate_json("create_study",
                                         [self.chart_session, "st" + "5", "st" + "5", "s" + "5",
                                          "Volume@tv-basicstudies-118",
@@ -116,14 +129,16 @@ class TradingViewWSS(threading.Thread):
         self.ws.send(self.generate_json("quote_hibernate_all", [self.session]))
 
     def add_symbols(self, symbol):
-        self.symbol_list.append(symbol)
-        self.ws.send(
-            self.generate_json("quote_add_symbols", [self.session, symbol, {"flags": ["force_permission"]}]))
+        if symbol not in self.symbol_list:
+            self.symbol_list.append(symbol)
+            self.ws.send(
+                self.generate_json("quote_add_symbols", [self.session, symbol, {"flags": ["force_permission"]}]))
 
     def make_fast_query(self):
-        self.ws.send((
-            self.generate_json("quote_fast_symbols", self.symbol_list)
-        ))
+        if self.ws.connected:
+            self.ws.send((
+                self.generate_json("quote_fast_symbols", self.symbol_list)
+            ))
 
     def get_market_status(self):
         """
@@ -198,6 +213,22 @@ class TradingViewWSS(threading.Thread):
         # return "~m~" + str(len(st)) + "~m~" + st
 
 
+def search_for_symbol(symbol):
+    exchange_list = ['NASDAQ', 'NYSE', 'EURONEXT PARIS', 'LSIN', 'NYSE ARCA & MKT']
+    try:
+        response = requests.get(url=f'https://symbol-search.tradingview.com/symbol_search/?text={symbol}').json()
+        allowed_symbols = dict()
+        index = 0
+        for company in response:
+            if company.get('exchange') in exchange_list and company.get(
+                    'type') == 'stock' and symbol.upper() == company.get('symbol'):
+                allowed_symbols[index] = company
+                index = index + 1
+        return allowed_symbols
+    except requests.exceptions.HTTPError as error:
+        raise Exception(error)
+
+
 def on_message(ws, message):
     print(f'### Got new message:###\n{message}\n')
 
@@ -219,3 +250,6 @@ def on_close(ws):
 # time.sleep(5)
 # trading.make_fast_query()
 # print(trading.get_market_status())
+# company = search_for_symbol('arkg')
+# print(company)
+# print(f'Total buttons:\n{len(company)}')
