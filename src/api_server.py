@@ -53,10 +53,11 @@ def get_symbol_info(ticker):
         if response:
             if response[0].get("prefix"):
                 pytrading_api.add_symbols(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
+                pytrading_api.make_fast_query(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
             else:
                 pytrading_api.add_symbols(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
+                pytrading_api.make_fast_query(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
             # time.sleep(5)
-            pytrading_api.make_fast_query()
             return {
                 'status': 'Success',
                 'message': f'Added {ticker.upper()} to watchlist'
