@@ -28,9 +28,28 @@ def watchlist_keyboard(watchlist) -> InlineKeyboardMarkup:
     Return watchlist keyboard
     """
     keyword_list = list()
+    temp_list = list()
     index = 0
+    location = 0
     for symbol in watchlist:
-        keyword_list.append(InlineKeyboardButton(text=symbol, callback_data=f"data_{index}"))
+        if index % 4 == 0:
+            temp_list.append(InlineKeyboardButton(text=symbol, callback_data=f'data_{index}'))
+            keyword_list.append(temp_list)
+            temp_list = list()
+        else:
+            temp_list.append(InlineKeyboardButton(text=symbol, callback_data=f'data_{index}'))
         index = index + 1
-    keyboard = InlineKeyboardMarkup([keyword_list])
+    if len(temp_list) < 4:
+        keyword_list.append(temp_list)
+    keyword_list.append([InlineKeyboardButton(text='Add', callback_data='add', switch_inline_query='add')])
+    keyboard = InlineKeyboardMarkup(keyword_list)
+    return keyboard
+
+
+def back_to_watchlist():
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(text="Back",
+                                                           callback_data="back_watch",
+                                                           )],
+                                     ]
+                                    )
     return keyboard

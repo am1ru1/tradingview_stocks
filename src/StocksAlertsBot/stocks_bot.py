@@ -25,7 +25,7 @@ def start(update: Update, context: CallbackContext) -> None:
     logger.info("User %s started the conversation.", user.first_name)
     update.message.reply_text("OK lets start add some stocks!\nSend the symbol or the company name")
     update.message.reply_text(text='Choose the stock type',
-                              reply_markup=watchlist_keyboard(context.user_data['watchlist']))
+                              reply_markup=menu_keyboard())
 
 
 def search(update: Update, _: CallbackContext) -> None:
@@ -36,7 +36,7 @@ def search(update: Update, _: CallbackContext) -> None:
 
 def update_watchlist(update: Update, context: CallbackContext) -> None:
     message = update.message.text.split(' ')
-    logger.info(f'{update.message.from_user} asked for {update.message.text}')
+    logger.info(f'{update.message.from_user.username} asked for {update.message.text}')
     watchlist = context.user_data.get('watchlist')
     if watchlist is None:
         watchlist = list()
@@ -77,12 +77,20 @@ def update_watchlist(update: Update, context: CallbackContext) -> None:
 
 
 def watchlist(update: Update, context: CallbackContext) -> None:
-    watchlist = context.user_data.get('watchlist')
-    update.message.reply_text(f'This is your watchlist: {watchlist}')
+    if update.callback_query:
+        update.callback_query.answer()
+    logger.info(f'{update.effective_chat.username} asked for watchlist')
+    if update.callback_query:
+        update.callback_query.message.edit_text(text='Choose the stock type',
+                                                reply_markup=watchlist_keyboard(context.user_data['watchlist']))
+    else:
+        update.message.reply_text(text='Choose the stock type',
+                                  reply_markup=watchlist_keyboard(context.user_data['watchlist']))
 
 
 def get_status(update: Update, context: CallbackContext) -> None:
     watchlist = context.user_data.get('watchlist')
+    market_status = requests.get(f'{base_url}/market').json()['market']
     logger.info(f'{update.message.from_user} asked for {update.message.text}')
     message = str()
     for symbol in watchlist:
@@ -92,28 +100,31 @@ def get_status(update: Update, context: CallbackContext) -> None:
             update.message.reply_text(f'Cant find {symbol}..')
             continue
         update.message.reply_text(
-            make_html(response['percent_change'], response['name'], response['company'], response['price']),
+            make_html(response['percent_change'], response['name'], response['company'], response['price'], market_status),
             parse_mode='HTML')
 
 
 def get_symbol_keyboard(update: Update, context: CallbackContext):
+    update.callback_query.answer()
     symbol_index = context.match.string.split('_')
+    market_status = requests.get(f'{base_url}/market').json()['market']
     symbol = context.user_data.get('watchlist')[int(symbol_index[1])]
-    logger.info(f'Requested symbol : {symbol}')
+    logger.info(f'{update.effective_user.username} Requested symbol : {symbol}')
     url = f'{base_url}symbol/{symbol}'
     response = requests.patch(url).json()
     if response.get('Error'):
-        update.message.reply_text(f'Cant find {symbol}..')
+        update.callback_query.message.edit_text(f'Cant find {symbol}..', reply_markup=back_to_watchlist())
         return
-    update.callback_query.message.delete()
-    update.callback_query.message.reply_text(make_html(response['percent_change'], response['name'], response['company'], response['price']),
-        parse_mode='HTML')
+    update.callback_query.message.edit_text(
+        make_html(response['percent_change'], response['name'], response['company'], response['price'], market_status),
+        parse_mode='HTML', reply_markup=back_to_watchlist())
 
 
 def get_symbol(update: Update, context: CallbackContext) -> None:
     message = update.message.text
     logger.info(f'{update.message.from_user} asked for {update.message.text}')
     message = message.split(' ')
+    market_status = requests.get(f'{base_url}/market').json()['market']
     if len(message) == 2:
         symbol = message[1]
         url = f'{base_url}symbol/{symbol}'
@@ -122,15 +133,19 @@ def get_symbol(update: Update, context: CallbackContext) -> None:
             update.message.reply_text(f'Cant find {symbol}..')
             return
         update.message.reply_text(
-            make_html(response['percent_change'], response['name'], response['company'], response['price']),
+            make_html(response['percent_change'], response['name'], response['company'], response['price'], market_status),
             parse_mode='HTML')
 
 
-def make_html(percent, symbol, company_name, price):
+def make_html(percent, symbol, company_name, price,market_status):
     # price_desc = percent_calc(percent)
     # message = None
-    message = f'<b>Company: </b> {company_name} \n<b>Symbol:</b> {symbol}\n<b>Change percent: </b>{percent_calc(percent)} \n<b>Price</b>:{price}\n<b>Market:</b>Market ETA'
+    message = f'<b>Company: </b> {company_name} \n<b>Symbol:</b> {symbol}\n<b>Change percent: </b>{percent_calc(percent)} \n<b>Price</b>:{price}\n<b>Market:</b>{market_status}'
     return message
+
+
+def capture(update: Update, context: CallbackContext) -> None:
+    pass
 
 
 def percent_calc(percent):
@@ -167,6 +182,8 @@ if __name__ == '__main__':
     dispatcher.add_handler(CallbackQueryHandler(get_symbol_keyboard, pattern='data'))
     dispatcher.add_handler(PrefixHandler('!', ['add', 'remove'], update_watchlist))
     dispatcher.add_handler(PrefixHandler('!', 'status', get_status))
-    dispatcher.add_handler(PrefixHandler('!', 'watchlist', watchlist))
+    dispatcher.add_handler(CommandHandler('watchlist', watchlist))
+    dispatcher.add_handler(CallbackQueryHandler(watchlist, pattern='back_watch'))
+
     updater.start_polling()
     updater.idle()
