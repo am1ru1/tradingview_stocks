@@ -3,7 +3,7 @@ import logging
 
 import requests
 from telegram import Update, Chat, ChatMember, ParseMode, ChatMemberUpdated
-from handlers import menu_keyboard
+from handlers import *
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -25,7 +25,7 @@ def start(update: Update, context: CallbackContext) -> None:
     logger.info("User %s started the conversation.", user.first_name)
     update.message.reply_text("OK lets start add some stocks!\nSend the symbol or the company name")
     update.message.reply_text(text='Choose the stock type',
-                              reply_markup=menu_keyboard())
+                              reply_markup=watchlist_keyboard(context.user_data['watchlist']))
 
 
 def search(update: Update, _: CallbackContext) -> None:
@@ -48,6 +48,8 @@ def update_watchlist(update: Update, context: CallbackContext) -> None:
                 if 'add' in message[0]:
                     watchlist.append(symbol)
                     logger.info(f'Adding to  watchlist {message[1]}')
+                    url = f'{base_url}symbol/{symbol}'
+                    response = requests.post(url)
                 elif 'remove' in message[0]:
                     logger.info(f'Removing {message[1]} from watchlist')
                     watchlist.remove(symbol)
@@ -63,12 +65,14 @@ def update_watchlist(update: Update, context: CallbackContext) -> None:
         elif message[1] not in watchlist:
             if 'add' in message[0]:
                 watchlist.append(message[1])
-        context.user_data['watchlist'] = watchlist
-        for symbol in watchlist:
-            url = f'{base_url}symbol/{symbol}'
-            response = requests.post(url)
-            if response.json()['status'] == 'Error' or response.status_code == 500:
-                update.message.reply_text(f'Cant find {symbol}, wrong symbol?')
+                url = f'{base_url}symbol/{message[1]}'
+                response = requests.post(url)
+        # context.user_data['watchlist'] = watchlist
+        # for symbol in watchlist:
+        #     url = f'{base_url}symbol/{symbol}'
+        #     response = requests.post(url)
+        #     if response.json()['status'] == 'Error' or response.status_code == 500:
+        #         update.message.reply_text(f'Cant find {symbol}, wrong symbol?')
         update.message.reply_text(f'Your watchlist updated to {watchlist}')
 
 
@@ -90,6 +94,20 @@ def get_status(update: Update, context: CallbackContext) -> None:
         update.message.reply_text(
             make_html(response['percent_change'], response['name'], response['company'], response['price']),
             parse_mode='HTML')
+
+
+def get_symbol_keyboard(update: Update, context: CallbackContext):
+    symbol_index = context.match.string.split('_')
+    symbol = context.user_data.get('watchlist')[int(symbol_index[1])]
+    logger.info(f'Requested symbol : {symbol}')
+    url = f'{base_url}symbol/{symbol}'
+    response = requests.patch(url).json()
+    if response.get('Error'):
+        update.message.reply_text(f'Cant find {symbol}..')
+        return
+    update.callback_query.message.delete()
+    update.callback_query.message.reply_text(make_html(response['percent_change'], response['name'], response['company'], response['price']),
+        parse_mode='HTML')
 
 
 def get_symbol(update: Update, context: CallbackContext) -> None:
@@ -143,9 +161,10 @@ if __name__ == '__main__':
     dispatcher.add_handler(CommandHandler('start', start))
     dispatcher.add_handler(CommandHandler('status', get_status))
     dispatcher.add_handler(CommandHandler('get', get_symbol))
-    dispatcher.add_handler(CommandHandler('add',update_watchlist))
+    dispatcher.add_handler(CommandHandler('add', update_watchlist))
     dispatcher.add_handler(CommandHandler('remove', update_watchlist))
     dispatcher.add_handler(CallbackQueryHandler(search, pattern='stock'))
+    dispatcher.add_handler(CallbackQueryHandler(get_symbol_keyboard, pattern='data'))
     dispatcher.add_handler(PrefixHandler('!', ['add', 'remove'], update_watchlist))
     dispatcher.add_handler(PrefixHandler('!', 'status', get_status))
     dispatcher.add_handler(PrefixHandler('!', 'watchlist', watchlist))
