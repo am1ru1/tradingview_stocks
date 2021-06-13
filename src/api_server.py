@@ -50,19 +50,23 @@ def get_symbol_info(ticker):
             return json.dumps(data)
     if request.method == 'POST':
         response = search_for_symbol(ticker)
+        symbol_name = None
         if response:
             if response[0].get("prefix"):
                 pytrading_api.add_symbols(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
                 if pytrading_api.market_status != "close":
                     pytrading_api.make_fast_query(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
+                symbol_name = f'{response[0].get("prefix")}:{response[0].get("symbol")}'
             else:
                 pytrading_api.add_symbols(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
                 if pytrading_api.market_status != "close":
                     pytrading_api.make_fast_query(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
+                symbol_name = f'{response[0].get("exchange")}:{response[0].get("symbol")}'
             # time.sleep(5)
             return {
                 'status': 'Success',
-                'message': f'Added {ticker.upper()} to watchlist'
+                'message': f'Added {ticker.upper()} to watchlist',
+                'symbol': symbol_name
             }
         else:
             return {
@@ -112,7 +116,7 @@ def search_info(key):
 def get_market_status():
     return {
         "market": f'{pytrading_api.market_status}'
-            }
+    }
 
 
 @api.route('/users/<user_id>/', methods=['GET', 'POST'])
@@ -127,9 +131,12 @@ def check_watchlist(user_id):
             response.append(database.get_symbol(symbol))
         return json.dumps(response)
 
-@api.route('/tradingview/', methods=['GET'])
+
+@api.route('/tradingview/', methods=['POST'])
 def get_view():
-    return render_template('view.html')
+    watchlist = request.data.decode("utf-8")
+    return render_template('template.html', watchlist)
+
 
 if __name__ == '__main__':
     api.run(threaded=True, debug=True)
