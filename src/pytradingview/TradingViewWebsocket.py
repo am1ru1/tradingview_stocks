@@ -127,9 +127,10 @@ class TradingViewWSS(threading.Thread):
         first_scan = self.db.get_all_symbols()
         first_scan = json.dumps(first_scan)
         clean_noises = re.sub('[^A-Za-z0-9:,.]+', '', first_scan)
-        cleaned_data = clean_noises.split(",")
-        for clean in cleaned_data:
-            self.add_symbols(clean)
+        if clean_noises:
+            cleaned_data = clean_noises.split(",")
+            for clean in cleaned_data:
+                self.add_symbols(clean)
         self.ws.send(self.generate_json("create_series",
                                         [self.chart_session, "s" + "5", "s" + "5", "symbol_" + "5", "5", 100]))
         # self.ws.send(self.generate_json("quote_fast_symbols", [self.session, "NYSE:TGT"]))
@@ -149,7 +150,7 @@ class TradingViewWSS(threading.Thread):
         if self.ws.connected:
             if symbol:
                 self.ws.send((
-                    self.generate_json("quote_fast_symbols", symbol)
+                    self.generate_json("quote_fast_symbols", [self.session, symbol])
                 ))
             else:
                 self.ws.send((self.generate_json("quote_fast_symbols", self.symbol_list)))
