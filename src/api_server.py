@@ -6,7 +6,7 @@ import signal
 
 from src.pytradingview.TradingViewWebsocket import TradingViewWSS, search_for_symbol
 from src.pytradingview.DBHelper import DBHelper
-from flask import Flask, json, request
+from flask import Flask, json, request, render_template
 
 logger = logging.getLogger('FlaskApp')
 log_format = logging.Formatter("%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s")
@@ -50,16 +50,23 @@ def get_symbol_info(ticker):
             return json.dumps(data)
     if request.method == 'POST':
         response = search_for_symbol(ticker)
+        symbol_name = None
         if response:
             if response[0].get("prefix"):
                 pytrading_api.add_symbols(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
+                if pytrading_api.market_status != "close":
+                    pytrading_api.make_fast_query(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
+                symbol_name = f'{response[0].get("prefix")}:{response[0].get("symbol")}'
             else:
                 pytrading_api.add_symbols(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
+                if pytrading_api.market_status != "close":
+                    pytrading_api.make_fast_query(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
+                symbol_name = f'{response[0].get("exchange")}:{response[0].get("symbol")}'
             # time.sleep(5)
-            pytrading_api.make_fast_query()
             return {
                 'status': 'Success',
-                'message': f'Added {ticker.upper()} to watchlist'
+                'message': f'Added {ticker.upper()} to watchlist',
+                'symbol': symbol_name
             }
         else:
             return {
@@ -105,6 +112,13 @@ def search_info(key):
         }
 
 
+@api.route('/market', methods=['GET'])
+def get_market_status():
+    return {
+        "market": f'{pytrading_api.market_status}'
+    }
+
+
 @api.route('/users/<user_id>/', methods=['GET', 'POST'])
 def check_watchlist(user_id):
     if request.method == 'POST':
@@ -116,6 +130,12 @@ def check_watchlist(user_id):
         for symbol in clean_noises.split(','):
             response.append(database.get_symbol(symbol))
         return json.dumps(response)
+
+
+@api.route('/tradingview/', methods=['POST'])
+def get_view():
+    watchlist = request.data.decode("utf-8")
+    return render_template('template.html', watchlist)
 
 
 if __name__ == '__main__':
