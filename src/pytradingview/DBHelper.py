@@ -79,12 +79,21 @@ class DBHelper(object):
                   """
             self.cur.execute(query, [symbol, percent, price, company])
         else:
-            query = """ UPDATE symbols
+            if company:
+                query = """ UPDATE symbols
                         SET percent_chg = ?,
-                            price = ?
+                            price = ?,
+                            company_name = ?
                         WHERE symbol = ?
                         """
-            self.cur.execute(query, [percent, price, symbol])
+                self.cur.execute(query, [percent, price, company, symbol])
+            else:
+                query = """ UPDATE symbols
+                            SET percent_chg = ?,
+                            price = ?                                                
+                            WHERE symbol = ?
+                            """
+                self.cur.execute(query, [percent, price, symbol])
         self.con.commit()
         logger.debug(f'Update {symbol} info')
 

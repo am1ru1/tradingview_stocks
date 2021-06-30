@@ -88,25 +88,25 @@ class TradingViewWSS(threading.Thread):
                                           sec_data["v"]['local_description'])
                 else:
                     self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"],
-                                          'none')
+                                          None)
             else:
                 if 'local_description' in sec_data["v"]:
                     self.db.update_symbol(sec_data["n"], sec_data["v"]["rchp"], sec_data["v"]["rtc"],
                                           sec_data["v"]['local_description'])
                 else:
                     self.db.update_symbol(sec_data["n"], sec_data["v"]["rchp"], sec_data["v"]["rtc"],
-                                          'null')
+                                          None)
         elif "lp" in sec_data["v"] and "ch" in sec_data["v"]:
             print("Non-Real")
             if "chp" in sec_data["v"]:
                 print(f'Symbol: {sec_data["n"]}\nPrice: {sec_data["v"]["lp"]}\nChange: {sec_data["v"]["chp"]}')
                 if 'local_description' in sec_data["v"]:
-                    self.db.update_symbol(sec_data["n"], sec_data["v"]["chp"], sec_data["v"]["lp"], 'null')
+                    self.db.update_symbol(sec_data["n"], sec_data["v"]["chp"], sec_data["v"]["lp"], None)
                 else:
-                    self.db.update_symbol(sec_data["n"], sec_data["v"]["chp"], sec_data["v"]["lp"], 'null')
+                    self.db.update_symbol(sec_data["n"], sec_data["v"]["chp"], sec_data["v"]["lp"], None)
             else:
                 print(f'Symbol: {sec_data["n"]}\nPrice: {sec_data["v"]["lp"]}\nChange: {sec_data["v"]["ch"]}')
-                self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"], 'null')
+                self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"], None)
         else:
             print(f"Cant find parameters at the JSON file.\n{sec_data}]n")
 
