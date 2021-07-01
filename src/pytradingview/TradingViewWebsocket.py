@@ -6,23 +6,14 @@ import re
 import requests
 import pandas as pd
 from websocket import create_connection
-from .firebase_data import update_symbol, Stock
-# from firebase_data import set_new_symbol, update_symbol, Stock
-# from DBHelper import DBHelper
-#
-# try:
-#     import thread
-# except ImportError:
-#     import _thread as thread
+from .firebase_data import update_symbol, Stock, get_all_symbols
 import time
 
 
 class TradingViewWSS(threading.Thread):
 
-    def __init__(self, database_connection):
-        # websocket.enableTrace(True)
+    def __init__(self):
         threading.Thread.__init__(self)
-        self.db = database_connection
         self.headers = json.dumps({
             'Connection': 'upgrade',
             'Host': 'data.tradingview.com',
@@ -86,30 +77,22 @@ class TradingViewWSS(threading.Thread):
             print(f'Symbol: {sec_data["n"]}\nPrice: {sec_data["v"]["rtc"]}\nChange: {sec_data["v"]["rchp"]}')
             if sec_data["v"]["rchp"] == 0:
                 if 'local_description' in sec_data["v"]:
-                    self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"],
-                                          sec_data["v"]['local_description'])
                     update_symbol(Stock(symbol=sec_data["v"]["pro_name"],
                                         company_name=sec_data["v"]['local_description'],
                                         price= sec_data["v"]["lp"],
                                         change_percent=sec_data["v"]["ch"]))
                 else:
-                    self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"],
-                                          None)
                     update_symbol(Stock(symbol=sec_data["n"],
                                         company_name=None,
                                         price=sec_data["v"]["lp"],
                                         change_percent=sec_data["v"]["ch"]))
             else:
                 if 'local_description' in sec_data["v"]:
-                    self.db.update_symbol(sec_data["n"], sec_data["v"]["rchp"], sec_data["v"]["rtc"],
-                                          sec_data["v"]['local_description'])
                     update_symbol(Stock(symbol=sec_data["v"]["pro_name"],
                                         company_name=sec_data["v"]['local_description'],
                                         price=sec_data["v"]["rtc"],
                                         change_percent=sec_data["v"]["rchp"]))
                 else:
-                    self.db.update_symbol(sec_data["n"], sec_data["v"]["rchp"], sec_data["v"]["rtc"],
-                                          None)
                     update_symbol(Stock(symbol=sec_data["n"],
                                         company_name=None,
                                         price=sec_data["v"]["rtc"],
@@ -119,20 +102,17 @@ class TradingViewWSS(threading.Thread):
             if "chp" in sec_data["v"]:
                 print(f'Symbol: {sec_data["n"]}\nPrice: {sec_data["v"]["lp"]}\nChange: {sec_data["v"]["chp"]}')
                 if 'local_description' in sec_data["v"]:
-                    self.db.update_symbol(sec_data["n"], sec_data["v"]["chp"], sec_data["v"]["lp"], None)
                     update_symbol(Stock(symbol=sec_data["n"],
                                         company_name=None,
                                         price=sec_data["v"]["lp"],
                                         change_percent=sec_data["v"]["chp"]))
                 else:
-                    self.db.update_symbol(sec_data["n"], sec_data["v"]["chp"], sec_data["v"]["lp"], None)
                     update_symbol(Stock(symbol=sec_data["n"],
                                         company_name=None,
                                         price=sec_data["v"]["lp"],
                                         change_percent=sec_data["v"]["chp"]))
             else:
                 print(f'Symbol: {sec_data["n"]}\nPrice: {sec_data["v"]["lp"]}\nChange: {sec_data["v"]["ch"]}')
-                self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"], None)
                 update_symbol(Stock(symbol=sec_data["n"],
                                     company_name=None,
                                     price=sec_data["v"]["lp"],
@@ -152,18 +132,11 @@ class TradingViewWSS(threading.Thread):
                                          "original_name", "pricescale",
                                          "pro_name", "short_name", "type", "update_mode", "volume", "currency_code",
                                          "rchp", "rtc"]))
-        # self.ws.send(
-        #     self.generate_json("quote_add_symbols", [self.session, "NYSE:TGT", {"flags": ['force_permission']}]))
-        first_scan = self.db.get_all_symbols()
-        first_scan = json.dumps(first_scan)
-        clean_noises = re.sub('[^A-Za-z0-9:,.]+', '', first_scan)
-        if clean_noises:
-            cleaned_data = clean_noises.split(",")
-            for clean in cleaned_data:
-                self.add_symbols(clean)
+        list_s = get_all_symbols()
+        for symbol in list_s:
+            self.add_symbols(symbol)
         self.ws.send(self.generate_json("create_series",
                                         [self.chart_session, "s" + "5", "s" + "5", "symbol_" + "5", "5", 100]))
-        # self.ws.send(self.generate_json("quote_fast_symbols", [self.session, "NYSE:TGT"]))
         self.ws.send(self.generate_json("create_study",
                                         [self.chart_session, "st" + "5", "st" + "5", "s" + "5",
                                          "Volume@tv-basicstudies-118",

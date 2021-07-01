@@ -1,11 +1,8 @@
-import re
 import logging
 import threading
-import time
 import signal
 from pytradingview.firebase_data import get_symbol_data
 from src.pytradingview.TradingViewWebsocket import TradingViewWSS, search_for_symbol
-from src.pytradingview.DBHelper import DBHelper
 from flask import Flask, json, request, render_template
 
 logger = logging.getLogger('FlaskApp')
@@ -24,10 +21,9 @@ def signal_handler(signum, frame):
 
 
 api = Flask(__name__)
-database = DBHelper()
 exit_event = threading.Event()
 signal.signal(signal.SIGINT, signal_handler)
-pytrading_api = TradingViewWSS(database_connection=database)
+pytrading_api = TradingViewWSS()
 pytrading_api.daemon = True
 pytrading_api.start()
 
@@ -43,11 +39,9 @@ def get_symbol_info(ticker):
         if response:
             if response[0].get("prefix"):
                 pytrading_api.add_symbols(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
-                # data = database.get_symbol(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
                 data = get_symbol_data(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
             else:
                 pytrading_api.add_symbols(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
-                # data = database.get_symbol(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
                 data = get_symbol_data(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
             return json.dumps(data.to_dict())
     if request.method == 'POST':
@@ -77,11 +71,9 @@ def get_symbol_info(ticker):
             }
     response = search_for_symbol(ticker)
     if "prefix" in response[0]:
-        # data = database.get_symbol(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
         data = get_symbol_data(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
 
     else:
-        # data = database.get_symbol(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
         data = get_symbol_data(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
     if 'Error' in data:
         logger.warning(f'Cant find {ticker}')
@@ -92,13 +84,13 @@ def get_symbol_info(ticker):
 
 @api.route('/users/<user_id>/<ticker>', methods=['POST'])
 def update_watchlist(user_id, ticker):
-    if request.method == 'POST':
-        if ',' in ticker:
-            for symbol in ticker.split(','):
-                database.update_watchlist(user_id=user_id, symbol=symbol)
-        else:
-            database.update_watchlist(user_id=user_id, symbol=ticker)
-    return json.dumps("status: ok")
+    # if request.method == 'POST':
+        # if ',' in ticker:
+        #     for symbol in ticker.split(','):
+        #         # database.update_watchlist(user_id=user_id, symbol=symbol)
+        # else:
+        #     # database.update_watchlist(user_id=user_id, symbol=ticker)
+    return json.dumps("status: not functional")
 
 
 @api.route('/symbol/search/<key>', methods=['POST'])
@@ -126,15 +118,15 @@ def get_market_status():
 
 @api.route('/users/<user_id>/', methods=['GET', 'POST'])
 def check_watchlist(user_id):
-    if request.method == 'POST':
-        database.create_user_table()
-    if request.method == 'GET':
-        response = list()
-        data = json.dumps(database.get_user_watchlist(user_id))
-        clean_noises = re.sub('[^A-Za-z0-9:,]+', '', data)
-        for symbol in clean_noises.split(','):
-            response.append(database.get_symbol(symbol))
-        return json.dumps(response)
+    # if request.method == 'POST':
+    #     database.create_user_table()
+    # if request.method == 'GET':
+    #     response = list()
+    #     data = json.dumps(database.get_user_watchlist(user_id))
+    #     clean_noises = re.sub('[^A-Za-z0-9:,]+', '', data)
+    #     for symbol in clean_noises.split(','):
+    #         response.append(database.get_symbol(symbol))
+        return json.dumps("Not functional")
 
 
 @api.route('/tradingview/', methods=['POST'])
