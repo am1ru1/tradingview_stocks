@@ -3,7 +3,7 @@ import logging
 import threading
 import time
 import signal
-
+from pytradingview.firebase_data import get_symbol_data
 from src.pytradingview.TradingViewWebsocket import TradingViewWSS, search_for_symbol
 from src.pytradingview.DBHelper import DBHelper
 from flask import Flask, json, request, render_template
@@ -43,11 +43,13 @@ def get_symbol_info(ticker):
         if response:
             if response[0].get("prefix"):
                 pytrading_api.add_symbols(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
-                data = database.get_symbol(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
+                # data = database.get_symbol(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
+                data = get_symbol_data(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
             else:
                 pytrading_api.add_symbols(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
-                data = database.get_symbol(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
-            return json.dumps(data)
+                # data = database.get_symbol(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
+                data = get_symbol_data(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
+            return json.dumps(data.to_dict())
     if request.method == 'POST':
         response = search_for_symbol(ticker)
         symbol_name = None
@@ -75,9 +77,12 @@ def get_symbol_info(ticker):
             }
     response = search_for_symbol(ticker)
     if "prefix" in response[0]:
-        data = database.get_symbol(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
+        # data = database.get_symbol(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
+        data = get_symbol_data(f'{response[0].get("prefix")}:{response[0].get("symbol")}')
+
     else:
-        data = database.get_symbol(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
+        # data = database.get_symbol(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
+        data = get_symbol_data(f'{response[0].get("exchange")}:{response[0].get("symbol")}')
     if 'Error' in data:
         logger.warning(f'Cant find {ticker}')
     else:

@@ -123,11 +123,11 @@ def get_symbol_keyboard(update: Update, context: CallbackContext):
     logger.info(f'{update.effective_user.username} Requested symbol : {symbol}')
     url = f'{base_url}symbol/{symbol}'
     response = requests.patch(url).json()
-    if response.get('Error'):
+    if response is None:
         update.callback_query.message.edit_text(f'Cant find {symbol}..', reply_markup=back_to_watchlist())
         return
     update.callback_query.message.edit_text(
-        make_html(response['percent_change'], response['name'], response['company'], response['price'], market_status),
+        make_html(response['change_percent'], response['symbol'], response['company_name'], response['price'], market_status),
         parse_mode='HTML', reply_markup=back_to_watchlist())
 
 
@@ -144,7 +144,7 @@ def get_symbol(update: Update, context: CallbackContext) -> None:
             update.message.reply_text(f'Cant find {symbol}..')
             return
         update.message.reply_text(
-            make_html(response['percent_change'], response['name'], response['company'], response['price'],
+            make_html(response['change_percent'], response['symbol'], response['company_name'], response['price'],
                       market_status),
             parse_mode='HTML')
 
@@ -173,11 +173,6 @@ def capture(update: Update, context: CallbackContext) -> None:
 def percent_calc(percent):
     if isinstance(percent, type) or percent == "" or percent is None:
         return f'0'
-    sign = percent[0]
-    if sign == "-":
-        percent = float(percent[:-1])
-    else:
-        percent = float(percent)
     if percent == 0:
         return f'{percent}%'
     elif percent > 3:

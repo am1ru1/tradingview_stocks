@@ -6,6 +6,8 @@ import re
 import requests
 import pandas as pd
 from websocket import create_connection
+from .firebase_data import update_symbol, Stock
+# from firebase_data import set_new_symbol, update_symbol, Stock
 # from DBHelper import DBHelper
 #
 # try:
@@ -86,27 +88,55 @@ class TradingViewWSS(threading.Thread):
                 if 'local_description' in sec_data["v"]:
                     self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"],
                                           sec_data["v"]['local_description'])
+                    update_symbol(Stock(symbol=sec_data["v"]["pro_name"],
+                                        company_name=sec_data["v"]['local_description'],
+                                        price= sec_data["v"]["lp"],
+                                        change_percent=sec_data["v"]["ch"]))
                 else:
                     self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"],
                                           None)
+                    update_symbol(Stock(symbol=sec_data["n"],
+                                        company_name=None,
+                                        price=sec_data["v"]["lp"],
+                                        change_percent=sec_data["v"]["ch"]))
             else:
                 if 'local_description' in sec_data["v"]:
                     self.db.update_symbol(sec_data["n"], sec_data["v"]["rchp"], sec_data["v"]["rtc"],
                                           sec_data["v"]['local_description'])
+                    update_symbol(Stock(symbol=sec_data["v"]["pro_name"],
+                                        company_name=sec_data["v"]['local_description'],
+                                        price=sec_data["v"]["rtc"],
+                                        change_percent=sec_data["v"]["rchp"]))
                 else:
                     self.db.update_symbol(sec_data["n"], sec_data["v"]["rchp"], sec_data["v"]["rtc"],
                                           None)
+                    update_symbol(Stock(symbol=sec_data["n"],
+                                        company_name=None,
+                                        price=sec_data["v"]["rtc"],
+                                        change_percent=sec_data["v"]["rchp"]))
         elif "lp" in sec_data["v"] and "ch" in sec_data["v"]:
             print("Non-Real")
             if "chp" in sec_data["v"]:
                 print(f'Symbol: {sec_data["n"]}\nPrice: {sec_data["v"]["lp"]}\nChange: {sec_data["v"]["chp"]}')
                 if 'local_description' in sec_data["v"]:
                     self.db.update_symbol(sec_data["n"], sec_data["v"]["chp"], sec_data["v"]["lp"], None)
+                    update_symbol(Stock(symbol=sec_data["n"],
+                                        company_name=None,
+                                        price=sec_data["v"]["lp"],
+                                        change_percent=sec_data["v"]["chp"]))
                 else:
                     self.db.update_symbol(sec_data["n"], sec_data["v"]["chp"], sec_data["v"]["lp"], None)
+                    update_symbol(Stock(symbol=sec_data["n"],
+                                        company_name=None,
+                                        price=sec_data["v"]["lp"],
+                                        change_percent=sec_data["v"]["chp"]))
             else:
                 print(f'Symbol: {sec_data["n"]}\nPrice: {sec_data["v"]["lp"]}\nChange: {sec_data["v"]["ch"]}')
                 self.db.update_symbol(sec_data["n"], sec_data["v"]["ch"], sec_data["v"]["lp"], None)
+                update_symbol(Stock(symbol=sec_data["n"],
+                                    company_name=None,
+                                    price=sec_data["v"]["lp"],
+                                    change_percent=sec_data["v"]["ch"]))
         else:
             print(f"Cant find parameters at the JSON file.\n{sec_data}]n")
 
